@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: visual-testing-db
+    environment:
+      POSTGRES_USER: visual_testing
+      POSTGRES_PASSWORD: visual_testing_pass
+      POSTGRES_DB: visual_testing_db
+    ports:
+      - "5433:5432"  # Custom port to avoid conflicts
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visual_testing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - visual-testing-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: visual-testing-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://visual_testing:visual_testing_pass@postgres:5432/visual_testing_db?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - GIN_MODE=release
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - visual-testing-network
+
+volumes:
+  postgres_data:
+
+networks:
+  visual-testing-network:
+    driver: bridge
+
